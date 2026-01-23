@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soil Sense AI - ตรวจวัดค่า pH ดิน</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Font (Prompt) for Thai Language -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Prompt', sans-serif;
+        }
+        @keyframes fade-in {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fade-in 0.5s ease-out forwards;
+        }
+        .hidden-section {
+            display: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-stone-50 text-stone-800 pb-10">
+
+    <!-- Header -->
+    <div class="bg-emerald-700 text-white p-6 rounded-b-3xl shadow-lg relative overflow-hidden">
+        <div class="absolute top-0 right-0 opacity-10 transform translate-x-10 -translate-y-10">
+            <i data-lucide="leaf" width="150" height="150"></i>
+        </div>
+        <h1 class="text-2xl font-bold mb-1 flex items-center gap-2">
+            <i data-lucide="leaf" class="fill-emerald-300"></i> Soil Sense AI
+        </h1>
+        <p class="text-emerald-100 text-sm opacity-90">
+            ผู้ช่วยวิเคราะห์ดินและแนะนำพืชปลูก
+        </p>
+    </div>
+
+    <div class="max-w-md mx-auto px-4 -mt-6">
+        
+        <!-- Main Card (Upload & Preview) -->
+        <div class="bg-white rounded-2xl shadow-xl p-5 mb-6 relative">
+            
+            <!-- Upload State -->
+            <div id="upload-section" class="flex flex-col items-center justify-center py-8 border-2 border-dashed border-stone-300 rounded-xl bg-stone-50 hover:bg-stone-100 transition-colors cursor-pointer" onclick="document.getElementById('file-input').click()">
+                <div class="bg-emerald-100 p-4 rounded-full mb-4">
+                    <i data-lucide="camera" class="text-emerald-600" width="32" height="32"></i>
+                </div>
+                <p class="font-semibold text-stone-600 mb-1">ถ่ายภาพดิน หรือ อัปโหลด</p>
+                <p class="text-xs text-stone-400">เพื่อเริ่มการวิเคราะห์ค่า pH</p>
+                <input type="file" id="file-input" class="hidden" accept="image/*" capture="environment" onchange="handleImageUpload(event)">
+            </div>
+
+            <!-- Image Preview State -->
+            <div id="preview-section" class="hidden-section relative">
+                <img id="preview-image" src="" alt="Soil sample" class="w-full h-48 object-cover rounded-xl">
+                
+                <!-- Loading Overlay -->
+                <div id="loading-overlay" class="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center text-white backdrop-blur-sm hidden-section">
+                    <i data-lucide="refresh-cw" class="animate-spin mb-2" width="32" height="32"></i>
+                    <p>กำลังวิเคราะห์โครงสร้างดิน...</p>
+                </div>
+
+                <!-- Reset Button -->
+                <button onclick="resetApp()" id="reset-btn" class="absolute top-2 right-2 bg-white/90 p-2 rounded-full text-stone-700 shadow-sm hover:bg-white hidden-section">
+                    <i data-lucide="refresh-cw" width="16" height="16"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="result-section" class="space-y-6 hidden-section animate-fade-in">
+            
+            <!-- pH Meter Display -->
+            <div class="bg-white rounded-2xl shadow-md p-6 border-l-4 border-emerald-500">
+                <div class="flex justify-between items-end mb-4">
+                    <div>
+                        <h2 class="text-stone-500 text-sm font-semibold uppercase tracking-wider">ค่า pH ของดิน</h2>
+                        <div class="flex items-baseline gap-2">
+                            <span id="ph-display" class="text-4xl font-bold text-emerald-600">7.0</span>
+                            <span class="text-stone-400 text-sm">/ 14.0</span>
+                        </div>
+                    </div>
+                    <div id="ph-badge" class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-600">
+                        เป็นกลาง
+                    </div>
+                </div>
+
+                <!-- Visual Gauge -->
+                <div class="relative h-4 bg-gradient-to-r from-red-500 via-green-500 to-blue-500 rounded-full mb-2">
+                    <div id="gauge-needle" class="absolute top-0 bottom-0 w-1 bg-white border-2 border-stone-800 rounded shadow-lg transform -translate-x-1/2 transition-all duration-500" style="left: 50%;"></div>
+                </div>
+                <div class="flex justify-between text-xs text-stone-400">
+                    <span>0 (กรด)</span>
+                    <span>7 (กลาง)</span>
+                    <span>14 (ด่าง)</span>
+                </div>
+
+                <!-- Slider -->
+                <div class="mt-6 pt-4 border-t border-stone-100">
+                    <label class="text-xs text-stone-500 flex items-center gap-1 mb-2">
+                        <i data-lucide="info" width="12" height="12"></i> ปรับค่า pH (หากคุณมีผลตรวจจริง)
+                    </label>
+                    <input type="range" id="ph-slider" min="3" max="10" step="0.1" value="7.0" class="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" oninput="handleSliderChange(this.value)">
+                </div>
+            </div>
+
+            <!-- Soil Info -->
+            <div class="bg-white rounded-2xl shadow-md p-6">
+                <h3 class="font-bold text-lg mb-2 flex items-center gap-2">
+                    <i data-lucide="droplets" class="text-blue-500" width="20" height="20"></i>
+                    ลักษณะดิน
+                </h3>
+                <p id="soil-desc" class="text-stone-600 leading-relaxed text-sm">
+                    คำอธิบายลักษณะดินจะปรากฏที่นี่...
+                </p>
+            </div>
+
+            <!-- Plant Recommendations -->
+            <div>
+                <h3 class="font-bold text-lg mb-3 px-1 flex items-center gap-2">
+                    <i data-lucide="leaf" class="text-green-500" width="20" height="20"></i>
+                    พืชที่แนะนำให้ปลูก
+                </h3>
+                <div id="plant-grid" class="grid grid-cols-2 gap-3">
+                    <!-- Plants will be injected here -->
+                </div>
+            </div>
+
+            <!-- Advice -->
+            <div class="bg-orange-50 rounded-2xl p-5 border border-orange-100">
+                <h3 class="font-bold text-orange-800 text-sm mb-2 flex items-center gap-2">
+                    <i data-lucide="thermometer-sun" width="18" height="18"></i>
+                    คำแนะนำในการปรับปรุงดิน
+                </h3>
+                <p id="treatment-advice" class="text-xs text-orange-700 leading-relaxed">
+                    คำแนะนำ...
+                </p>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Database
+        const PLANT_DATABASE = [
+            {
+                range: [0, 5.5],
+                type: "ดินกรดจัด (Strongly Acidic)",
+                badge: "ดินกรดจัด",
+                description: "ดินมีความเป็นกรดสูง ขาดธาตุอาหารหลักบางชนิด แต่เหมาะกับพืชที่ชอบดินเปรี้ยว",
+                plants: [
+                    { name: "บลูเบอร์รี่", icon: "🫐" },
+                    { name: "สับปะรด", icon: "🍍" },
+                    { name: "มันฝรั่ง", icon: "🥔" },
+                    { name: "ดอกไฮเดรนเยีย", icon: "🌸" },
+                    { name: "เฟิร์น", icon: "🌿" }
+                ],
+                colorClass: "text-red-500",
+                bgClass: "bg-red-100"
+            },
+            {
+                range: [5.6, 6.5],
+                type: "ดินกรดอ่อน (Slightly Acidic)",
+                badge: "ดินกรดอ่อน",
+                description: "ช่วงที่ดีที่สุดสำหรับพืชส่วนใหญ่ ธาตุอาหารละลายได้ดี จุลินทรีย์ทำงานได้ดี",
+                plants: [
+                    { name: "ข้าว", icon: "🌾" },
+                    { name: "ข้าวโพด", icon: "🌽" },
+                    { name: "มะเขือเทศ", icon: "🍅" },
+                    { name: "กุหลาบ", icon: "🌹" },
+                    { name: "สตรอว์เบอร์รี", icon: "🍓" },
+                    { name: "ยางพารา", icon: "🌳" }
+                ],
+                colorClass: "text-orange-500",
+                bgClass: "bg-orange-100"
+            },
+            {
+                range: [6.6, 7.5],
+                type: "ดินเป็นกลาง (Neutral)",
+                badge: "ดินเป็นกลาง",
+                description: "ดินมีความสมดุล เหมาะสำหรับการเพาะปลูกพืชผักสวนครัวและไม้ผลทั่วไป",
+                plants: [
+                    { name: "ผักกาดหอม", icon: "🥬" },
+                    { name: "กะหล่ำปลี", icon: "🥬" },
+                    { name: "แครอท", icon: "🥕" },
+                    { name: "ถั่วต่างๆ", icon: "🥜" },
+                    { name: "อ้อย", icon: "🎋" }
+                ],
+                colorClass: "text-green-600",
+                bgClass: "bg-green-100"
+            },
+            {
+                range: [7.6, 14],
+                type: "ดินด่าง (Alkaline)",
+                badge: "ดินด่าง",
+                description: "ดินมีความเค็มหรือด่างสูง อาจขาดธาตุเหล็ก สังกะสี เหมาะกับพืชทนเค็ม",
+                plants: [
+                    { name: "หน่อไม้ฝรั่ง", icon: "🎋" },
+                    { name: "ผักโขม", icon: "🍃" },
+                    { name: "กระเทียม", icon: "🧄" },
+                    { name: "มะพร้าว", icon: "🥥" },
+                    { name: "อินทผาลัม", icon: "🌴" }
+                ],
+                colorClass: "text-blue-600",
+                bgClass: "bg-blue-100"
+            }
+        ];
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // DOM Elements
+        const uploadSection = document.getElementById('upload-section');
+        const previewSection = document.getElementById('preview-section');
+        const previewImage = document.getElementById('preview-image');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const resultSection = document.getElementById('result-section');
+        const resetBtn = document.getElementById('reset-btn');
+        const phSlider = document.getElementById('ph-slider');
+
+        // Functions
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const imageUrl = URL.createObjectURL(file);
+                
+                // Show Preview
+                uploadSection.classList.add('hidden-section');
+                previewSection.classList.remove('hidden-section');
+                previewImage.src = imageUrl;
+                
+                // Start Analysis
+                analyzeSoil();
+            }
+        }
+
+        function analyzeSoil() {
+            loadingOverlay.classList.remove('hidden-section');
+            resultSection.classList.add('hidden-section');
+            resetBtn.classList.add('hidden-section');
+
+            // Simulate 2s delay
+            setTimeout(() => {
+                loadingOverlay.classList.add('hidden-section');
+                resetBtn.classList.remove('hidden-section');
+                
+                // Random pH 4.5 - 8.5
+                const randomPH = (Math.random() * (8.5 - 4.5) + 4.5).toFixed(1);
+                updateUI(randomPH);
+                
+                // Show Results
+                resultSection.classList.remove('hidden-section');
+                
+                // Scroll to results
+                resultSection.scrollIntoView({ behavior: 'smooth' });
+                
+            }, 2000);
+        }
+
+        function handleSliderChange(value) {
+            updateUI(value);
+        }
+
+        function updateUI(ph) {
+            ph = parseFloat(ph);
+            phSlider.value = ph;
+
+            // Find Data
+            const data = PLANT_DATABASE.find(d => ph >= d.range[0] && ph <= d.range[1]);
+            
+            if (!data) return;
+
+            // Update pH Display
+            const phDisplay = document.getElementById('ph-display');
+            phDisplay.innerText = ph.toFixed(1);
+            phDisplay.className = `text-4xl font-bold ${data.colorClass}`;
+
+            // Update Badge
+            const badge = document.getElementById('ph-badge');
+            badge.innerText = data.badge;
+            badge.className = `px-3 py-1 rounded-full text-xs font-bold ${data.bgClass} ${data.colorClass}`;
+
+            // Update Gauge Needle
+            const percentage = (ph / 14) * 100;
+            document.getElementById('gauge-needle').style.left = `${percentage}%`;
+
+            // Update Description
+            document.getElementById('soil-desc').innerText = data.description;
+
+            // Update Plant Grid
+            const plantGrid = document.getElementById('plant-grid');
+            plantGrid.innerHTML = data.plants.map(plant => `
+                <div class="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-shadow border border-stone-100 flex flex-col items-center text-center">
+                    <div class="text-3xl mb-2">${plant.icon}</div>
+                    <span class="font-semibold text-stone-700 text-sm">${plant.name}</span>
+                </div>
+            `).join('');
+
+            // Update Advice
+            const adviceText = ph < 5.5 
+                ? "ดินเป็นกรดมาก: แนะนำให้เติมปูนขาว (Lime) หรือโดโลไมท์ เพื่อปรับค่า pH ให้สูงขึ้นก่อนปลูกพืชทั่วไป" 
+                : ph > 7.5 
+                ? "ดินเป็นด่าง: แนะนำให้ใส่ปุ๋ยหมัก หรือกำมะถันผง (Sulfur) เพื่อลดค่าความเป็นด่างลง"
+                : "ดินมีสภาพสมบูรณ์ดี เหมาะแก่การเพาะปลูก ควรเติมอินทรีย์วัตถุอย่างสม่ำเสมอ";
+            
+            document.getElementById('treatment-advice').innerText = adviceText;
+        }
+
+        function resetApp() {
+            document.getElementById('file-input').value = '';
+            uploadSection.classList.remove('hidden-section');
+            previewSection.classList.add('hidden-section');
+            resultSection.classList.add('hidden-section');
+            previewImage.src = '';
+        }
+
+    </script>
+</body>
+</html>
